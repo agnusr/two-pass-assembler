@@ -1,0 +1,245 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.HashMap;
+import java.util.Map;
+
+public class TwoPassAssemblerGUI extends JFrame {
+
+    // UI components
+    private JTextArea inputArea;
+    private JTextArea optabArea;
+    private JTextArea symtabArea;
+    private JTextArea intermediateArea;
+    private JTextArea outputArea;
+    private JTextArea objectCodeArea;
+
+    // Data structures
+    private Map<String, Integer> symtab;   // Symbol Table
+    private Map<String, String> optab;     // Operation Table
+    private StringBuilder intermediateCode; // Intermediate Code
+    private StringBuilder objectCode;       // Object Code
+    private StringBuilder outputCode;       // Final Output Code
+
+    public TwoPassAssemblerGUI() {
+        // Setup frame
+        setTitle("Two-Pass Assembler");
+        setSize(1000, 800);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Create panels for input and output areas
+        JPanel inputPanel = new JPanel();
+        inputPanel.setLayout(new GridLayout(2, 1));
+
+        // Panel for Input Assembly Code and OPTAB with labels
+        JPanel inputSubPanel = new JPanel(new GridLayout(1, 2));
+        
+        JPanel inputCodePanel = new JPanel(new BorderLayout());
+        inputArea = new JTextArea(10, 40);
+        inputCodePanel.add(new JLabel("Input (Assembly Code)"), BorderLayout.NORTH);
+        inputCodePanel.add(new JScrollPane(inputArea), BorderLayout.CENTER);
+        inputSubPanel.add(inputCodePanel);
+
+        JPanel optabCodePanel = new JPanel(new BorderLayout());
+        optabArea = new JTextArea(10, 20);
+        optabCodePanel.add(new JLabel("OPTAB (Operation Table)"), BorderLayout.NORTH);
+        optabCodePanel.add(new JScrollPane(optabArea), BorderLayout.CENTER);
+        inputSubPanel.add(optabCodePanel);
+
+        inputPanel.add(inputSubPanel);
+
+        // Panel for Intermediate Code, SYMTAB, Output Code, and Object Code with labels
+        JPanel outputSubPanel = new JPanel(new GridLayout(1, 4));
+
+        JPanel intermediatePanel = new JPanel(new BorderLayout());
+        intermediateArea = new JTextArea(10, 20);
+        intermediatePanel.add(new JLabel("Intermediate Code"), BorderLayout.NORTH);
+        intermediatePanel.add(new JScrollPane(intermediateArea), BorderLayout.CENTER);
+        outputSubPanel.add(intermediatePanel);
+
+        JPanel symtabPanel = new JPanel(new BorderLayout());
+        symtabArea = new JTextArea(10, 20);
+        symtabPanel.add(new JLabel("SYMTAB (Symbol Table)"), BorderLayout.NORTH);
+        symtabPanel.add(new JScrollPane(symtabArea), BorderLayout.CENTER);
+        outputSubPanel.add(symtabPanel);
+
+        JPanel outputCodePanel = new JPanel(new BorderLayout());
+        outputArea = new JTextArea(10, 20);
+        outputCodePanel.add(new JLabel("Output (Pass 2 Output Code)"), BorderLayout.NORTH);
+        outputCodePanel.add(new JScrollPane(outputArea), BorderLayout.CENTER);
+        outputSubPanel.add(outputCodePanel);
+
+        JPanel objectCodePanel = new JPanel(new BorderLayout());
+        objectCodeArea = new JTextArea(10, 20);
+        objectCodePanel.add(new JLabel("Object Code"), BorderLayout.NORTH);
+        objectCodePanel.add(new JScrollPane(objectCodeArea), BorderLayout.CENTER);
+        outputSubPanel.add(objectCodePanel);
+
+        inputPanel.add(outputSubPanel);
+
+        // Add inputPanel to the frame
+        add(inputPanel, BorderLayout.CENTER);
+
+        // Button for Pass One and Pass Two
+        JPanel buttonPanel = new JPanel();
+        JButton passOneButton = new JButton("Pass One");
+        JButton passTwoButton = new JButton("Pass Two");
+        buttonPanel.add(passOneButton);
+        buttonPanel.add(passTwoButton);
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        // Initialize symbol table, operation table, intermediate code, object code, and output code
+        symtab = new HashMap<>();
+        optab = new HashMap<>();
+        intermediateCode = new StringBuilder();
+        objectCode = new StringBuilder();
+        outputCode = new StringBuilder();
+
+        // Load sample OPTAB
+        loadSampleOptab();
+
+        // Pass One Button Action
+        passOneButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                passOne();
+            }
+        });
+
+        // Pass Two Button Action
+        passTwoButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                passTwo();
+            }
+        });
+    }
+
+    // Load Sample OPTAB (Operation Table)
+    private void loadSampleOptab() {
+        optab.put("LDA", "33");
+        optab.put("STA", "44");
+        optab.put("LDCH", "53");
+        optab.put("STCH", "57");
+
+        // Display OPTAB in the area
+        optabArea.setText("");
+        for (Map.Entry<String, String> entry : optab.entrySet()) {
+            optabArea.append(entry.getKey() + " -> " + entry.getValue() + "\n");
+        }
+    }
+
+    // Pass One: Generate Symbol Table and Intermediate Code
+    private void passOne() {
+        String[] assemblyCode = inputArea.getText().split("\\n");
+        int locationCounter = 2000; // Starting address from input
+        symtab.clear();
+        intermediateCode.setLength(0);  // Clear previous intermediate code
+
+        // Process each line of assembly code
+        for (String line : assemblyCode) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            String[] parts = line.split("\\s+");
+
+            // Handle labels and instructions
+            if (parts.length == 3 && parts[0].endsWith(":")) {
+                String label = parts[0].replace(":", "");
+                symtab.put(label, locationCounter);
+                intermediateCode.append(locationCounter).append("\t").append(label).append("\t").append(parts[1]).append("\t").append(parts[2]).append("\n");
+            } else {
+                intermediateCode.append(locationCounter).append("\t**\t").append(parts[0]).append("\t").append(parts[1]).append("\n");
+            }
+
+            // Increment location counter based on the instruction type
+            if (parts[1].equals("RESW")) {
+                locationCounter += Integer.parseInt(parts[2]) * 3;
+            } else if (parts[1].equals("RESB")) {
+                locationCounter += Integer.parseInt(parts[2]);
+            } else if (parts[1].equals("WORD")) {
+                locationCounter += 3;
+            } else if (parts[1].equals("BYTE")) {
+                locationCounter += 1;
+            } else {
+                locationCounter += 3; // Default for instructions like LDA, STA, etc.
+            }
+        }
+
+        // Display intermediate code and symbol table
+        intermediateArea.setText(intermediateCode.toString());
+        symtabArea.setText("");
+        for (Map.Entry<String, Integer> entry : symtab.entrySet()) {
+            symtabArea.append(entry.getKey() + ": " + entry.getValue() + "\n");
+        }
+
+        JOptionPane.showMessageDialog(this, "Pass One Completed");
+    }
+
+    // Pass Two: Generate Object Code using OPTAB and SYMTAB
+    private void passTwo() {
+        String[] assemblyCode = inputArea.getText().split("\\n");
+        objectCode.setLength(0);  // Clear previous object code
+        outputCode.setLength(0);  // Clear previous output code
+
+        String headerRecord = "H^^002000^002023\n";
+        objectCode.append(headerRecord);
+
+        String textRecord = "T^002000^22";
+        StringBuilder textRecordContent = new StringBuilder();
+
+        for (String line : assemblyCode) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            String[] parts = line.split("\\s+");
+
+            // Generate object code based on instruction
+            if (parts.length >= 2) {
+                String opcode = optab.getOrDefault(parts[1], "??");
+                String operand = parts.length > 2 ? parts[2] : "";
+
+                // Translate operand if it is a label
+                if (symtab.containsKey(operand)) {
+                    operand = Integer.toHexString(symtab.get(operand)).toUpperCase();
+                } else if (parts[1].equals("WORD")) {
+                    operand = String.format("%06X", Integer.parseInt(operand));
+                } else if (parts[1].equals("BYTE")) {
+                    operand = Integer.toHexString(operand.charAt(2)).toUpperCase();
+                }
+
+                if (opcode.equals("??")) {
+                    outputCode.append(parts[0] + "\t" + parts[1] + "\t" + parts[2] + "\n");
+                } else {
+                    String machineCode = opcode + operand;
+                    outputCode.append(parts[0] + "\t" + parts[1] + "\t" + parts[2] + "\t" + machineCode + "\n");
+                                       // Append to text record content
+                                       textRecordContent.append("^").append(machineCode);
+                                    }
+                                }
+                            }
+                    
+                            // Complete the text record and add it to the object code
+                            textRecord += textRecordContent.toString();
+                            objectCode.append(textRecord).append("\n");
+                    
+                            // End record
+                            String endRecord = "E^002000";
+                            objectCode.append(endRecord).append("\n");
+                    
+                            // Display output code and object code
+                            outputArea.setText(outputCode.toString());
+                            objectCodeArea.setText(objectCode.toString());
+                    
+                            JOptionPane.showMessageDialog(this, "Pass Two Completed");
+                        }
+                    
+                        public static void main(String[] args) {
+                            SwingUtilities.invokeLater(() -> {
+                                TwoPassAssemblerGUI gui = new TwoPassAssemblerGUI();
+                                gui.setVisible(true);
+                            });
+                        }
+                    }
+                    
